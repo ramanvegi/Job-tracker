@@ -1,0 +1,25 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Rules for job applications
+    match /users/{userId}/applications/{appId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow write: if request.auth != null && request.auth.uid == userId 
+        && (!('remarks' in request.resource.data) || request.resource.data.remarks.size() <= 500)
+        && (!('companyName' in request.resource.data) || request.resource.data.companyName.size() <= 300)
+        && (!('role' in request.resource.data) || request.resource.data.role.size() <= 300)
+        && (!('source' in request.resource.data) || request.resource.data.source.size() <= 300)
+        && (!('jobLink' in request.resource.data) || request.resource.data.jobLink.size() <= 1000)
+        && (!('referralReqSent' in request.resource.data) || request.resource.data.referralReqSent.size() <= 300)
+        && (!('responsesReceived' in request.resource.data) || request.resource.data.responsesReceived.size() <= 300)
+        && (!('referralsGiven' in request.resource.data) || request.resource.data.referralsGiven.size() <= 300)
+        && (!('avgSalary' in request.resource.data) || request.resource.data.avgSalary.size() <= 300);
+    }
+
+    // Rules for settings (e.g. daily targets)
+    match /users/{userId}/settings/{settingsId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}
