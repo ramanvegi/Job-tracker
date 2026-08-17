@@ -6,12 +6,12 @@ import {
 } from 'firebase/firestore';
 import { db } from './firebase';
 
-const STATUS_OPTIONS = ['Applied', 'Phone Screen', 'Interviewing', 'Offer', 'Accepted', 'Rejected', 'Withdrawn', 'Wishlist'];
+const STATUS_OPTIONS = ['Applied', 'Waiting', 'Phone Screen', 'Interviewing', 'Offer', 'Accepted', 'Rejected', 'Withdrawn', 'Wishlist'];
 const TYPE_OPTIONS = ['Referral', 'Cold Mail', 'Manual'];
 const LOG_TYPE_OPTIONS = ['Referral', 'Cold Mail', 'Manual', 'Manual Easy'];
 const TYPE_COLORS = { Referral: '#5B8DEF', 'Cold Mail': '#F5A623', Manual: '#2DD4BF' };
 const STATUS_COLORS = {
-  Applied: '#8B93A1', 'Phone Screen': '#5B8DEF', Interviewing: '#F5A623',
+  Applied: '#8B93A1', Waiting: '#38BDF8', 'Phone Screen': '#5B8DEF', Interviewing: '#F5A623',
   Offer: '#4ADE80', Accepted: '#4ADE80', Rejected: '#F0556B', Withdrawn: '#5B616F', Wishlist: '#A78BFA'
 };
 
