@@ -358,7 +358,7 @@ export default function JobTracker({ user, onSignOut }) {
 
       <div className="jat-header">
         <div>
-          <h1 className="jat-title jat-display">Jobs Application Tracker</h1>
+          <h1 className="jat-title jat-display">Job Applications Tracker</h1>
           <div className="jat-subtitle">{formatDisplay(today)} · {applications.length} total applications logged</div>
         </div>
         <div className="jat-header-actions">
