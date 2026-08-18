@@ -15,7 +15,14 @@ const STATUS_COLORS = {
   Offer: '#4ADE80', Accepted: '#4ADE80', Rejected: '#F0556B', Withdrawn: '#5B616F', Wishlist: '#A78BFA'
 };
 
-const todayStr = () => new Date().toISOString().slice(0, 10);
+function toLocalYMD(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+const todayStr = () => toLocalYMD(new Date());
 
 const emptyForm = () => ({
   date: todayStr(), applicationType: 'Manual', source: '', companyName: '', role: '',
@@ -29,7 +36,7 @@ function getMonday(dateStr) {
   const day = d.getDay();
   const diff = day === 0 ? -6 : 1 - day;
   d.setDate(d.getDate() + diff);
-  return d.toISOString().slice(0, 10);
+  return toLocalYMD(d);
 }
 function formatDisplay(str) {
   if (!str) return '—';
@@ -70,6 +77,36 @@ export default function JobTracker({ user, onSignOut }) {
   const [deletingId, setDeletingId] = useState(null);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
+
+  const [tableScrollWidth, setTableScrollWidth] = useState(0);
+  const tableRef = React.useRef(null);
+  const tableWrapRef = React.useRef(null);
+  const topScrollRef = React.useRef(null);
+
+  useEffect(() => {
+    if (tableRef.current) {
+      setTableScrollWidth(tableRef.current.scrollWidth);
+    }
+    const observer = new ResizeObserver(entries => {
+      for (let entry of entries) {
+        setTableScrollWidth(entry.target.scrollWidth);
+      }
+    });
+    if (tableRef.current) observer.observe(tableRef.current);
+    return () => observer.disconnect();
+  }, [applications, tab, search, statusFilter, editingId]);
+
+  const handleTopScroll = () => {
+    if (topScrollRef.current && tableWrapRef.current) {
+      tableWrapRef.current.scrollLeft = topScrollRef.current.scrollLeft;
+    }
+  };
+
+  const handleTableScroll = () => {
+    if (topScrollRef.current && tableWrapRef.current) {
+      topScrollRef.current.scrollLeft = tableWrapRef.current.scrollLeft;
+    }
+  };
 
   const appsCol = collection(db, 'users', user.uid, 'applications');
   const targetsDocRef = doc(db, 'users', user.uid, 'settings', 'targets');
@@ -133,12 +170,12 @@ export default function JobTracker({ user, onSignOut }) {
   }
   function cancelEdit() { setEditingId(null); setEditForm(null); }
   async function doDelete(id) {
+    if (!window.confirm("Are you sure you want to delete this application?")) return;
     try {
       await deleteDoc(doc(db, 'users', user.uid, 'applications', id));
     } catch (err) {
       alert('Could not delete: ' + err.message);
     }
-    setDeletingId(null);
   }
 
   async function updateTarget(key, value) {
@@ -312,6 +349,27 @@ export default function JobTracker({ user, onSignOut }) {
         .jat-toolbar { display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
         .jat-toolbar .jat-input, .jat-toolbar .jat-select { width: auto; min-width: 160px; }
         .jat-table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; }
+        .jat-top-scroll-wrap {
+          overflow-x: auto;
+          overflow-y: hidden;
+          width: 100%;
+          height: 10px;
+          margin-bottom: 4px;
+        }
+        .jat-top-scroll-wrap::-webkit-scrollbar {
+          height: 6px;
+        }
+        .jat-top-scroll-wrap::-webkit-scrollbar-track {
+          background: var(--surface-2);
+          border-radius: 3px;
+        }
+        .jat-top-scroll-wrap::-webkit-scrollbar-thumb {
+          background: var(--border);
+          border-radius: 3px;
+        }
+        .jat-top-scroll-wrap::-webkit-scrollbar-thumb:hover {
+          background: var(--text-faint);
+        }
         table.jat-table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
         table.jat-table th { background: var(--surface-2); color: var(--text-dim); text-align: left; padding: 10px 12px;
           font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.03em; white-space: nowrap; }
@@ -449,11 +507,20 @@ export default function JobTracker({ user, onSignOut }) {
             </select>
           </div>
 
-          <div className="jat-table-wrap">
+          {tableScrollWidth > 0 && (
+            <div 
+              ref={topScrollRef} 
+              onScroll={handleTopScroll} 
+              className="jat-top-scroll-wrap"
+            >
+              <div style={{ width: tableScrollWidth + 'px', height: '1px' }} />
+            </div>
+          )}
+          <div className="jat-table-wrap" ref={tableWrapRef} onScroll={handleTableScroll}>
             {filteredApps.length === 0 ? (
               <div className="jat-empty">No applications yet. Add your first one above — it'll appear right here at the top.</div>
             ) : (
-              <table className="jat-table">
+              <table className="jat-table" ref={tableRef}>
                 <thead>
                   <tr>
                     <th>Date</th><th>Type</th><th>Source</th><th>Company</th><th>Role</th><th>Job Link</th>
@@ -513,14 +580,7 @@ export default function JobTracker({ user, onSignOut }) {
                       <td style={{ maxWidth: 260, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{a.remarks || '—'}</td>
                       <td style={{ whiteSpace: 'nowrap' }}>
                         <button className="jat-icon-btn" onClick={() => startEdit(a)}>Edit</button>
-                        {deletingId === a.id ? (
-                          <>
-                            <button className="jat-icon-btn danger" onClick={() => doDelete(a.id)}>Confirm</button>
-                            <button className="jat-icon-btn" onClick={() => setDeletingId(null)}>Cancel</button>
-                          </>
-                        ) : (
-                          <button className="jat-icon-btn danger" onClick={() => setDeletingId(a.id)}>Delete</button>
-                        )}
+                        <button className="jat-icon-btn danger" onClick={() => doDelete(a.id)}>Delete</button>
                       </td>
                     </tr>
                   ))}
@@ -532,79 +592,100 @@ export default function JobTracker({ user, onSignOut }) {
       )}
 
       {dataLoaded && tab === 'daily' && (
-        <div className="jat-table-wrap">
-          {dailyData.length === 0 ? <div className="jat-empty">No data yet.</div> : (
-            <table className="jat-table">
-              <thead><tr><th>Date</th><th>Referral</th><th>Cold Mail</th><th>Manual</th><th>Total</th><th>Manual Target</th><th>Status</th></tr></thead>
-              <tbody>
-                {dailyData.map(([date, v]) => (
-                  <tr key={date}>
-                    <td className="jat-mono">{formatDisplay(date)}</td>
-                    <td className="jat-mono">{v.Referral}</td>
-                    <td className="jat-mono">{v['Cold Mail']}</td>
-                    <td className="jat-mono">{v.Manual}</td>
-                    <td className="jat-mono">{v.total}</td>
-                    <td className="jat-mono">{targetTotal}</td>
-                    <td className={v.Manual >= targetTotal ? 'jat-met' : 'jat-notmet'}>{v.Manual >= targetTotal ? 'Target Met' : 'Below Target'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        <>
+          {tableScrollWidth > 0 && (
+            <div ref={topScrollRef} onScroll={handleTopScroll} className="jat-top-scroll-wrap">
+              <div style={{ width: tableScrollWidth + 'px', height: '1px' }} />
+            </div>
           )}
-        </div>
+          <div className="jat-table-wrap" ref={tableWrapRef} onScroll={handleTableScroll}>
+            {dailyData.length === 0 ? <div className="jat-empty">No data yet.</div> : (
+              <table className="jat-table" ref={tableRef}>
+                <thead><tr><th>Date</th><th>Referral</th><th>Cold Mail</th><th>Manual</th><th>Manual Target</th><th>Status</th><th>Total</th></tr></thead>
+                <tbody>
+                  {dailyData.map(([date, v]) => (
+                    <tr key={date}>
+                      <td className="jat-mono">{formatDisplay(date)}</td>
+                      <td className="jat-mono">{v.Referral}</td>
+                      <td className="jat-mono">{v['Cold Mail']}</td>
+                      <td className="jat-mono">{v.Manual}</td>
+                      <td className="jat-mono">{targetTotal}</td>
+                      <td className={v.Manual >= targetTotal ? 'jat-met' : 'jat-notmet'}>{v.Manual >= targetTotal ? 'Target Met' : 'Below Target'}</td>
+                      <td className="jat-mono">{v.total}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </>
       )}
 
       {dataLoaded && tab === 'weekly' && (
-        <div className="jat-table-wrap">
-          {weeklyData.length === 0 ? <div className="jat-empty">No data yet.</div> : (
-            <table className="jat-table">
-              <thead><tr><th>Week</th><th>Referral</th><th>Cold Mail</th><th>Manual</th><th>Total</th><th>Manual Target</th><th>Status</th></tr></thead>
-              <tbody>
-                {weeklyData.map(([wk, v]) => {
-                  const wTarget = targetTotal * 7;
-                  return (
-                    <tr key={wk}>
-                      <td className="jat-mono">{formatWeekLabel(wk)}</td>
-                      <td className="jat-mono">{v.Referral}</td>
-                      <td className="jat-mono">{v['Cold Mail']}</td>
-                      <td className="jat-mono">{v.Manual}</td>
-                      <td className="jat-mono">{v.total}</td>
-                      <td className="jat-mono">{wTarget}</td>
-                      <td className={v.Manual >= wTarget ? 'jat-met' : 'jat-notmet'}>{v.Manual >= wTarget ? 'Target Met' : 'Below Target'}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+        <>
+          {tableScrollWidth > 0 && (
+            <div ref={topScrollRef} onScroll={handleTopScroll} className="jat-top-scroll-wrap">
+              <div style={{ width: tableScrollWidth + 'px', height: '1px' }} />
+            </div>
           )}
-        </div>
+          <div className="jat-table-wrap" ref={tableWrapRef} onScroll={handleTableScroll}>
+            {weeklyData.length === 0 ? <div className="jat-empty">No data yet.</div> : (
+              <table className="jat-table" ref={tableRef}>
+                <thead><tr><th>Week</th><th>Referral</th><th>Cold Mail</th><th>Manual</th><th>Manual Target</th><th>Status</th><th>Total</th></tr></thead>
+                <tbody>
+                  {weeklyData.map(([wk, v]) => {
+                    const wTarget = targetTotal * 7;
+                    return (
+                      <tr key={wk}>
+                        <td className="jat-mono">{formatWeekLabel(wk)}</td>
+                        <td className="jat-mono">{v.Referral}</td>
+                        <td className="jat-mono">{v['Cold Mail']}</td>
+                        <td className="jat-mono">{v.Manual}</td>
+                        <td className="jat-mono">{wTarget}</td>
+                        <td className={v.Manual >= wTarget ? 'jat-met' : 'jat-notmet'}>{v.Manual >= wTarget ? 'Target Met' : 'Below Target'}</td>
+                        <td className="jat-mono">{v.total}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </>
       )}
 
       {dataLoaded && tab === 'monthly' && (
-        <div className="jat-table-wrap">
-          {monthlyData.length === 0 ? <div className="jat-empty">No data yet.</div> : (
-            <table className="jat-table">
-              <thead><tr><th>Month</th><th>Referral</th><th>Cold Mail</th><th>Manual</th><th>Total</th><th>Manual Target</th><th>Status</th></tr></thead>
-              <tbody>
-                {monthlyData.map(([key, v]) => {
-                  const [y, m] = key.split('-').map(Number);
-                  const mTarget = targetTotal * daysInMonth(y, m - 1);
-                  return (
-                    <tr key={key}>
-                      <td className="jat-mono">{monthLabel(key)}</td>
-                      <td className="jat-mono">{v.Referral}</td>
-                      <td className="jat-mono">{v['Cold Mail']}</td>
-                      <td className="jat-mono">{v.Manual}</td>
-                      <td className="jat-mono">{v.total}</td>
-                      <td className="jat-mono">{mTarget}</td>
-                      <td className={v.Manual >= mTarget ? 'jat-met' : 'jat-notmet'}>{v.Manual >= mTarget ? 'Target Met' : 'Below Target'}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+        <>
+          {tableScrollWidth > 0 && (
+            <div ref={topScrollRef} onScroll={handleTopScroll} className="jat-top-scroll-wrap">
+              <div style={{ width: tableScrollWidth + 'px', height: '1px' }} />
+            </div>
           )}
-        </div>
+          <div className="jat-table-wrap" ref={tableWrapRef} onScroll={handleTableScroll}>
+            {monthlyData.length === 0 ? <div className="jat-empty">No data yet.</div> : (
+              <table className="jat-table" ref={tableRef}>
+                <thead><tr><th>Month</th><th>Referral</th><th>Cold Mail</th><th>Manual</th><th>Manual Target</th><th>Status</th><th>Total</th></tr></thead>
+                <tbody>
+                  {monthlyData.map(([key, v]) => {
+                    const [y, m] = key.split('-').map(Number);
+                    const mTarget = targetTotal * daysInMonth(y, m - 1);
+                    return (
+                      <tr key={key}>
+                        <td className="jat-mono">{monthLabel(key)}</td>
+                        <td className="jat-mono">{v.Referral}</td>
+                        <td className="jat-mono">{v['Cold Mail']}</td>
+                        <td className="jat-mono">{v.Manual}</td>
+                        <td className="jat-mono">{mTarget}</td>
+                        <td className={v.Manual >= mTarget ? 'jat-met' : 'jat-notmet'}>{v.Manual >= mTarget ? 'Target Met' : 'Below Target'}</td>
+                        <td className="jat-mono">{v.total}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </>
       )}
 
       {dataLoaded && tab === 'summary' && (
