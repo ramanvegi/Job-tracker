@@ -320,8 +320,12 @@ export default function JobTracker({ user, onSignOut }) {
         .jat-export-btn, .jat-signout-btn { background: var(--surface-2); border: 1px solid var(--border); color: var(--text);
           padding: 10px 16px; border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer; }
         .jat-export-btn:hover, .jat-signout-btn:hover { border-color: var(--text-faint); }
-        .jat-pulse { display: flex; gap: 14px; background: var(--surface); border: 1px solid var(--border);
-          border-radius: 12px; padding: 14px 18px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
+        .jat-pulse { 
+          display: flex; gap: 14px; background: var(--surface); border: 1px solid var(--border);
+          border-radius: 12px; padding: 14px 18px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; 
+          position: sticky; top: 0; z-index: 100;
+          box-shadow: 0 8px 30px rgba(0,0,0,0.6);
+        }
         .jat-pulse-item { min-width: 130px; flex: 1; }
         .jat-pulse-label { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-dim); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.04em; }
         .jat-pulse-count { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--text); }
@@ -355,20 +359,28 @@ export default function JobTracker({ user, onSignOut }) {
           width: 100%;
           height: 10px;
           margin-bottom: 4px;
+          position: sticky;
+          top: 62px; /* Adds spacing gap below the sticky header bar */
+          z-index: 99;
+          background: var(--bg);
         }
-        .jat-top-scroll-wrap::-webkit-scrollbar {
+        .jat-top-scroll-wrap::-webkit-scrollbar,
+        .jat-table-wrap::-webkit-scrollbar {
           height: 6px;
         }
-        .jat-top-scroll-wrap::-webkit-scrollbar-track {
+        .jat-top-scroll-wrap::-webkit-scrollbar-track,
+        .jat-table-wrap::-webkit-scrollbar-track {
           background: var(--surface-2);
           border-radius: 3px;
         }
-        .jat-top-scroll-wrap::-webkit-scrollbar-thumb {
-          background: var(--border);
+        .jat-top-scroll-wrap::-webkit-scrollbar-thumb,
+        .jat-table-wrap::-webkit-scrollbar-thumb {
+          background: #ffffff;
           border-radius: 3px;
         }
-        .jat-top-scroll-wrap::-webkit-scrollbar-thumb:hover {
-          background: var(--text-faint);
+        .jat-top-scroll-wrap::-webkit-scrollbar-thumb:hover,
+        .jat-table-wrap::-webkit-scrollbar-thumb:hover {
+          background: #e2e8f0;
         }
         table.jat-table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
         table.jat-table th { background: var(--surface-2); color: var(--text-dim); text-align: left; padding: 10px 12px;
@@ -407,10 +419,11 @@ export default function JobTracker({ user, onSignOut }) {
           .jat-pulse { padding: 12px; gap: 12px; }
           .jat-pulse-item { min-width: calc(50% - 6px); }
           .jat-pulse-item:last-child { min-width: 100%; }
-          .jat-toolbar { flex-direction: column; align-items: stretch; }
+           .jat-toolbar { flex-direction: column; align-items: stretch; }
           .jat-toolbar .jat-input, .jat-toolbar .jat-select { width: 100%; }
           .jat-form-grid { grid-template-columns: 1fr; }
           .jat-kpi-row { grid-template-columns: 1fr 1fr; }
+           .jat-top-scroll-wrap { top: 112px; } /* Mobile adjustments for wrapped stats layout with gap */
         }
       `}</style>
 
