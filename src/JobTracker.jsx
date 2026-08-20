@@ -6,12 +6,12 @@ import {
 } from 'firebase/firestore';
 import { db } from './firebase';
 
-const STATUS_OPTIONS = ['Applied', 'Waiting', 'Phone Screen', 'Interviewing', 'Offer', 'Accepted', 'Rejected', 'Withdrawn', 'Wishlist'];
+const STATUS_OPTIONS = ['Applied', 'Waiting', 'Exam Completed', 'Phone Screen', 'Interviewing', 'Offer', 'Accepted', 'Rejected', 'Withdrawn', 'Wishlist'];
 const TYPE_OPTIONS = ['Referral', 'Cold Mail', 'Manual'];
 const LOG_TYPE_OPTIONS = ['Referral', 'Cold Mail', 'Manual', 'Manual Easy'];
 const TYPE_COLORS = { Referral: '#5B8DEF', 'Cold Mail': '#F5A623', Manual: '#2DD4BF' };
 const STATUS_COLORS = {
-  Applied: '#8B93A1', Waiting: '#38BDF8', 'Phone Screen': '#5B8DEF', Interviewing: '#F5A623',
+  Applied: '#8B93A1', Waiting: '#38BDF8', 'Exam Completed': '#10B981', 'Phone Screen': '#5B8DEF', Interviewing: '#F5A623',
   Offer: '#4ADE80', Accepted: '#4ADE80', Rejected: '#F0556B', Withdrawn: '#5B616F', Wishlist: '#A78BFA'
 };
 
@@ -73,8 +73,6 @@ export default function JobTracker({ user, onSignOut }) {
   const [tab, setTab] = useState('log');
   const [form, setForm] = useState(emptyForm());
   const [editingId, setEditingId] = useState(null);
-  const [editForm, setEditForm] = useState(null);
-  const [deletingId, setDeletingId] = useState(null);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
 
@@ -149,6 +147,10 @@ export default function JobTracker({ user, onSignOut }) {
 
   async function handleAdd(e) {
     e.preventDefault();
+    if (editingId) {
+      await saveEdit();
+      return;
+    }
     if (!form.companyName.trim() || !form.role.trim()) return;
     try {
       await addDoc(appsCol, { ...form, createdAt: serverTimestamp() });
@@ -158,21 +160,26 @@ export default function JobTracker({ user, onSignOut }) {
     }
   }
 
-  function startEdit(a) { setEditingId(a.id); setEditForm({ ...a }); }
+  function startEdit(a) { setEditingId(a.id); setForm({ ...a }); }
   async function saveEdit() {
-    const { id, createdAt, ...fields } = editForm;
+    const { id, createdAt, ...fields } = form;
     try {
       await updateDoc(doc(db, 'users', user.uid, 'applications', editingId), fields);
-      setEditingId(null); setEditForm(null);
+      setEditingId(null);
+      setForm(emptyForm());
     } catch (err) {
       alert('Could not save: ' + err.message);
     }
   }
-  function cancelEdit() { setEditingId(null); setEditForm(null); }
+  function cancelEdit() { setEditingId(null); setForm(emptyForm()); }
   async function doDelete(id) {
     if (!window.confirm("Are you sure you want to delete this application?")) return;
     try {
       await deleteDoc(doc(db, 'users', user.uid, 'applications', id));
+      if (id === editingId) {
+        setEditingId(null);
+        setForm(emptyForm());
+      }
     } catch (err) {
       alert('Could not delete: ' + err.message);
     }
@@ -483,7 +490,7 @@ export default function JobTracker({ user, onSignOut }) {
       {dataLoaded && tab === 'log' && (
         <>
           <div className="jat-card">
-            <h3 className="jat-card-title">Log a new application (adds to the top of the table)</h3>
+            <h3 className="jat-card-title">{editingId ? 'Edit application details' : 'Log a new application (adds to the top of the table)'}</h3>
             <form onSubmit={handleAdd}>
               <div className="jat-form-grid">
                 <input className={inputCls} type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} required />
@@ -508,7 +515,15 @@ export default function JobTracker({ user, onSignOut }) {
                 </select>
                 <textarea className="jat-textarea" placeholder="Remarks" rows={3} value={form.remarks} onChange={e => setForm({ ...form, remarks: e.target.value })} style={{ gridColumn: '1 / -1' }} maxLength={500} />
               </div>
-              <button type="submit" className="jat-add-btn">Add to top</button>
+              {editingId ? (
+                <div style={{ display: 'flex', gap: '10px', marginTop: '12px' }}>
+                  <button type="submit" className="jat-add-btn" style={{ margin: 0 }}>Save changes</button>
+                  <button type="button" className="jat-add-btn danger" style={{ margin: 0, background: 'var(--danger)', color: '#fff' }} onClick={() => doDelete(editingId)}>Delete application</button>
+                  <button type="button" className="jat-add-btn" style={{ margin: 0, background: 'var(--surface-2)', color: 'var(--text)' }} onClick={cancelEdit}>Cancel</button>
+                </div>
+              ) : (
+                <button type="submit" className="jat-add-btn">Add to top</button>
+              )}
             </form>
           </div>
 
@@ -542,41 +557,8 @@ export default function JobTracker({ user, onSignOut }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredApps.map(a => editingId === a.id ? (
-                    <tr key={a.id}>
-                      <td><input className={inputCls} type="date" value={editForm.date} onChange={e => setEditForm({ ...editForm, date: e.target.value })} /></td>
-                      <td>
-                        <select className="jat-select" value={editForm.applicationType} onChange={e => setEditForm({ ...editForm, applicationType: e.target.value })}>
-                          {LOG_TYPE_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
-                        </select>
-                      </td>
-                      <td><input className={inputCls} value={editForm.source} onChange={e => setEditForm({ ...editForm, source: e.target.value })} maxLength={300} /></td>
-                      <td><input className={inputCls} value={editForm.companyName} onChange={e => setEditForm({ ...editForm, companyName: e.target.value })} maxLength={300} /></td>
-                      <td><input className={inputCls} value={editForm.role} onChange={e => setEditForm({ ...editForm, role: e.target.value })} maxLength={300} /></td>
-                      <td><input className={inputCls} value={editForm.jobLink} onChange={e => setEditForm({ ...editForm, jobLink: e.target.value })} maxLength={1000} /></td>
-                      <td><input className={inputCls} value={editForm.referralReqSent} onChange={e => setEditForm({ ...editForm, referralReqSent: e.target.value })} maxLength={300} /></td>
-                      <td><input className={inputCls} value={editForm.responsesReceived} onChange={e => setEditForm({ ...editForm, responsesReceived: e.target.value })} maxLength={300} /></td>
-                      <td><input className={inputCls} value={editForm.referralsGiven} onChange={e => setEditForm({ ...editForm, referralsGiven: e.target.value })} maxLength={300} /></td>
-                      <td>
-                        <select className="jat-select" value={editForm.status} onChange={e => setEditForm({ ...editForm, status: e.target.value })}>
-                          {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
-                        </select>
-                      </td>
-                      <td><input className={inputCls} value={editForm.avgSalary} onChange={e => setEditForm({ ...editForm, avgSalary: e.target.value })} maxLength={300} /></td>
-                      <td><input className={inputCls} type="date" value={editForm.followUpDate} onChange={e => setEditForm({ ...editForm, followUpDate: e.target.value })} /></td>
-                      <td>
-                        <select className="jat-select" value={editForm.applied} onChange={e => setEditForm({ ...editForm, applied: e.target.value })}>
-                          <option value="YES">YES</option><option value="NO">NO</option>
-                        </select>
-                      </td>
-                      <td><textarea className="jat-textarea" rows={2} style={{ minWidth: 220 }} value={editForm.remarks} onChange={e => setEditForm({ ...editForm, remarks: e.target.value })} maxLength={500} /></td>
-                      <td style={{ whiteSpace: 'nowrap' }}>
-                        <button className="jat-icon-btn" onClick={saveEdit}>Save</button>
-                        <button className="jat-icon-btn" onClick={cancelEdit}>Cancel</button>
-                      </td>
-                    </tr>
-                  ) : (
-                    <tr key={a.id}>
+                  {filteredApps.map(a => (
+                    <tr key={a.id} style={editingId === a.id ? { background: 'rgba(91, 141, 239, 0.15)' } : {}}>
                       <td className="jat-mono">{formatDisplay(a.date)}</td>
                       <td><span className="jat-tag" style={{ background: TYPE_COLORS[normType(a.applicationType)] + '22', color: TYPE_COLORS[normType(a.applicationType)] }}>{a.applicationType}</span></td>
                       <td>{a.source || '—'}</td>
