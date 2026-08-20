@@ -2,9 +2,14 @@ import React, { useState, useEffect, useMemo } from 'react';
 import * as XLSX from 'xlsx';
 import {
   collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot,
-  query, orderBy, serverTimestamp, setDoc, getDoc
+  query, orderBy, serverTimestamp, setDoc
 } from 'firebase/firestore';
 import { db } from './firebase';
+
+import ProgressBar from './components/ProgressBar';
+import LogForm from './components/LogForm';
+import Tables from './components/Tables';
+import './JobTracker.css';
 
 const STATUS_OPTIONS = ['Applied', 'Waiting', 'Exam Completed', 'Phone Screen', 'Interviewing', 'Offer', 'Accepted', 'Rejected', 'Withdrawn', 'Wishlist'];
 const TYPE_OPTIONS = ['Referral', 'Cold Mail', 'Manual'];
@@ -57,14 +62,16 @@ function monthLabel(key) {
 }
 function normType(t) { if (t === 'Manual Easy') return 'Manual'; return TYPE_OPTIONS.includes(t) ? t : 'Manual'; }
 
-function ProgressBar({ value, target, color }) {
-  const pct = target > 0 ? Math.min(100, (value / target) * 100) : 0;
-  return (
-    <div className="jat-bar-track">
-      <div className="jat-bar-fill" style={{ width: pct + '%', background: color }} />
-    </div>
-  );
-}
+export {
+  STATUS_OPTIONS,
+  TYPE_COLORS,
+  STATUS_COLORS,
+  formatDisplay,
+  normType,
+  daysInMonth,
+  monthLabel,
+  formatWeekLabel
+};
 
 export default function JobTracker({ user, onSignOut }) {
   const [applications, setApplications] = useState([]);
@@ -75,36 +82,6 @@ export default function JobTracker({ user, onSignOut }) {
   const [editingId, setEditingId] = useState(null);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
-
-  const [tableScrollWidth, setTableScrollWidth] = useState(0);
-  const tableRef = React.useRef(null);
-  const tableWrapRef = React.useRef(null);
-  const topScrollRef = React.useRef(null);
-
-  useEffect(() => {
-    if (tableRef.current) {
-      setTableScrollWidth(tableRef.current.scrollWidth);
-    }
-    const observer = new ResizeObserver(entries => {
-      for (let entry of entries) {
-        setTableScrollWidth(entry.target.scrollWidth);
-      }
-    });
-    if (tableRef.current) observer.observe(tableRef.current);
-    return () => observer.disconnect();
-  }, [applications, tab, search, statusFilter, editingId]);
-
-  const handleTopScroll = () => {
-    if (topScrollRef.current && tableWrapRef.current) {
-      tableWrapRef.current.scrollLeft = topScrollRef.current.scrollLeft;
-    }
-  };
-
-  const handleTableScroll = () => {
-    if (topScrollRef.current && tableWrapRef.current) {
-      topScrollRef.current.scrollLeft = tableWrapRef.current.scrollLeft;
-    }
-  };
 
   const appsCol = collection(db, 'users', user.uid, 'applications');
   const targetsDocRef = doc(db, 'users', user.uid, 'settings', 'targets');
@@ -306,134 +283,6 @@ export default function JobTracker({ user, onSignOut }) {
 
   return (
     <div className="jat-root">
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
-        .jat-root {
-          --bg: #0F1115; --surface: #171B22; --surface-2: #1D222B; --border: #262B35;
-          --text: #EDEFF3; --text-dim: #8B93A1; --text-faint: #5B616F;
-          --referral: #5B8DEF; --coldmail: #F5A623; --manual: #2DD4BF;
-          --success: #4ADE80; --danger: #F0556B;
-          background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif;
-          min-height: 100vh; padding: 24px; box-sizing: border-box;
-        }
-        .jat-root * { box-sizing: border-box; }
-        .jat-display { font-family: 'Space Grotesk', sans-serif; }
-        .jat-mono { font-family: 'IBM Plex Mono', monospace; }
-        .jat-header { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px; margin-bottom: 20px; }
-        .jat-title { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; margin: 0; }
-        .jat-subtitle { color: var(--text-dim); font-size: 13px; margin-top: 4px; }
-        .jat-header-actions { display: flex; gap: 10px; align-items: center; }
-        .jat-user-email { color: var(--text-dim); font-size: 12px; }
-        .jat-export-btn, .jat-signout-btn { background: var(--surface-2); border: 1px solid var(--border); color: var(--text);
-          padding: 10px 16px; border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer; }
-        .jat-export-btn:hover, .jat-signout-btn:hover { border-color: var(--text-faint); }
-        .jat-pulse { 
-          display: flex; gap: 14px; background: var(--surface); border: 1px solid var(--border);
-          border-radius: 12px; padding: 14px 18px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; 
-          position: sticky; top: 0; z-index: 100;
-          box-shadow: 0 8px 30px rgba(0,0,0,0.6);
-        }
-        .jat-pulse-item { min-width: 130px; flex: 1; }
-        .jat-pulse-label { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-dim); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.04em; }
-        .jat-pulse-count { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--text); }
-        .jat-bar-track { height: 6px; background: var(--surface-2); border-radius: 3px; overflow: hidden; }
-        .jat-bar-fill { height: 100%; border-radius: 3px; transition: width 0.3s ease; }
-        .jat-tabs { display: flex; gap: 4px; margin-bottom: 20px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
-        .jat-tab { padding: 10px 16px; background: none; border: none; color: var(--text-dim); font-size: 13px;
-          font-weight: 500; cursor: pointer; border-bottom: 2px solid transparent; font-family: 'Inter', sans-serif; }
-        .jat-tab.active { color: var(--text); border-bottom-color: var(--referral); }
-        .jat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px; margin-bottom: 18px; }
-        .jat-card-title { font-size: 14px; font-weight: 600; margin: 0 0 14px 0; }
-        .jat-form-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
-        .jat-input, .jat-select { background: var(--surface-2); border: 1px solid var(--border); color: var(--text);
-          padding: 8px 10px; border-radius: 6px; font-size: 13px; width: 100%; font-family: 'Inter', sans-serif; }
-        .jat-input::placeholder { color: var(--text-faint); }
-        .jat-input:focus, .jat-select:focus { outline: none; border-color: var(--referral); }
-        .jat-textarea { background: var(--surface-2); border: 1px solid var(--border); color: var(--text);
-          padding: 8px 10px; border-radius: 6px; font-size: 13px; width: 100%; font-family: 'Inter', sans-serif;
-          resize: vertical; min-height: 60px; }
-        .jat-textarea::placeholder { color: var(--text-faint); }
-        .jat-textarea:focus { outline: none; border-color: var(--referral); }
-        .jat-add-btn { background: var(--referral); color: #0F1115; border: none; padding: 9px 18px; border-radius: 6px;
-          font-size: 13px; font-weight: 600; cursor: pointer; margin-top: 12px; }
-        .jat-add-btn:hover { opacity: 0.9; }
-        .jat-toolbar { display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
-        .jat-toolbar .jat-input, .jat-toolbar .jat-select { width: auto; min-width: 160px; }
-        .jat-table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; }
-        .jat-top-scroll-wrap {
-          overflow-x: auto;
-          overflow-y: hidden;
-          width: 100%;
-          height: 10px;
-          margin-bottom: 4px;
-          position: sticky;
-          top: 62px; /* Adds spacing gap below the sticky header bar */
-          z-index: 99;
-          background: var(--bg);
-        }
-        .jat-top-scroll-wrap::-webkit-scrollbar,
-        .jat-table-wrap::-webkit-scrollbar {
-          height: 6px;
-        }
-        .jat-top-scroll-wrap::-webkit-scrollbar-track,
-        .jat-table-wrap::-webkit-scrollbar-track {
-          background: var(--surface-2);
-          border-radius: 3px;
-        }
-        .jat-top-scroll-wrap::-webkit-scrollbar-thumb,
-        .jat-table-wrap::-webkit-scrollbar-thumb {
-          background: #ffffff;
-          border-radius: 3px;
-        }
-        .jat-top-scroll-wrap::-webkit-scrollbar-thumb:hover,
-        .jat-table-wrap::-webkit-scrollbar-thumb:hover {
-          background: #e2e8f0;
-        }
-        table.jat-table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
-        table.jat-table th { background: var(--surface-2); color: var(--text-dim); text-align: left; padding: 10px 12px;
-          font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.03em; white-space: nowrap; }
-        table.jat-table td { padding: 9px 12px; border-top: 1px solid var(--border); vertical-align: top; }
-        table.jat-table tr:hover td { background: rgba(255,255,255,0.02); }
-        .jat-tag { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
-        .jat-link { color: var(--referral); text-decoration: none; max-width: 200px; display: inline-block;
-          overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
-        .jat-link:hover { text-decoration: underline; }
-        .jat-icon-btn { background: none; border: 1px solid var(--border); color: var(--text-dim); border-radius: 5px;
-          padding: 4px 8px; font-size: 11px; cursor: pointer; margin-right: 4px; font-family: 'Inter', sans-serif; }
-        .jat-icon-btn:hover { color: var(--text); border-color: var(--text-faint); }
-        .jat-icon-btn.danger:hover { color: var(--danger); border-color: var(--danger); }
-        .jat-empty { text-align: center; color: var(--text-faint); padding: 30px; font-size: 13px; }
-        .jat-kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 18px; }
-        .jat-kpi { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px; }
-        .jat-kpi-label { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 6px; }
-        .jat-kpi-value { font-family: 'IBM Plex Mono', monospace; font-size: 22px; font-weight: 500; }
-        .jat-status-list { display: flex; flex-direction: column; gap: 8px; }
-        .jat-status-row { display: flex; align-items: center; gap: 10px; }
-        .jat-status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-        .jat-status-name { flex: 1; font-size: 13px; color: var(--text-dim); }
-        .jat-status-count { font-family: 'IBM Plex Mono', monospace; font-size: 13px; }
-        .jat-target-form { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-end; }
-        .jat-target-field label { display: block; font-size: 11px; color: var(--text-dim); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.03em; }
-        .jat-target-field input { width: 100px; }
-        .jat-met { color: var(--success); font-weight: 600; }
-        .jat-notmet { color: var(--text-faint); }
-        
-        @media (max-width: 768px) {
-          .jat-root { padding: 12px; }
-          .jat-header { flex-direction: column; align-items: stretch; gap: 12px; }
-          .jat-header-actions { flex-direction: column; align-items: stretch; width: 100%; gap: 8px; }
-          .jat-user-email { text-align: left; }
-          .jat-pulse { padding: 12px; gap: 12px; }
-          .jat-pulse-item { min-width: calc(50% - 6px); }
-          .jat-pulse-item:last-child { min-width: 100%; }
-           .jat-toolbar { flex-direction: column; align-items: stretch; }
-          .jat-toolbar .jat-input, .jat-toolbar .jat-select { width: 100%; }
-          .jat-form-grid { grid-template-columns: 1fr; }
-          .jat-kpi-row { grid-template-columns: 1fr 1fr; }
-           .jat-top-scroll-wrap { top: 112px; } /* Mobile adjustments for wrapped stats layout with gap */
-        }
-      `}</style>
-
       <div className="jat-header">
         <div>
           <h1 className="jat-title jat-display">Job Applications Tracker</h1>
@@ -488,199 +337,35 @@ export default function JobTracker({ user, onSignOut }) {
       {!dataLoaded && <div className="jat-empty">Loading your data…</div>}
 
       {dataLoaded && tab === 'log' && (
-        <>
-          <div className="jat-card">
-            <h3 className="jat-card-title">{editingId ? 'Edit application details' : 'Log a new application (adds to the top of the table)'}</h3>
-            <form onSubmit={handleAdd}>
-              <div className="jat-form-grid">
-                <input className={inputCls} type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} required />
-                <select className="jat-select" value={form.applicationType} onChange={e => setForm({ ...form, applicationType: e.target.value })}>
-                  {LOG_TYPE_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
-                </select>
-                <input className={inputCls} placeholder="Source (e.g. LinkedIn)" value={form.source} onChange={e => setForm({ ...form, source: e.target.value })} maxLength={300} />
-                <input className={inputCls} placeholder="Company name" value={form.companyName} onChange={e => setForm({ ...form, companyName: e.target.value })} required maxLength={300} />
-                <input className={inputCls} placeholder="Role" value={form.role} onChange={e => setForm({ ...form, role: e.target.value })} required maxLength={300} />
-                <input className={inputCls} placeholder="Job link (URL)" value={form.jobLink} onChange={e => setForm({ ...form, jobLink: e.target.value })} maxLength={1000} />
-                <input className={inputCls} placeholder="Referral req sent" value={form.referralReqSent} onChange={e => setForm({ ...form, referralReqSent: e.target.value })} maxLength={300} />
-                <input className={inputCls} placeholder="Responses received" value={form.responsesReceived} onChange={e => setForm({ ...form, responsesReceived: e.target.value })} maxLength={300} />
-                <input className={inputCls} placeholder="Referrals given" value={form.referralsGiven} onChange={e => setForm({ ...form, referralsGiven: e.target.value })} maxLength={300} />
-                <select className="jat-select" value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}>
-                  {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
-                <input className={inputCls} placeholder="Avg salary" value={form.avgSalary} onChange={e => setForm({ ...form, avgSalary: e.target.value })} maxLength={300} />
-                <input className={inputCls} type="date" placeholder="Follow-up date" value={form.followUpDate} onChange={e => setForm({ ...form, followUpDate: e.target.value })} />
-                <select className="jat-select" value={form.applied} onChange={e => setForm({ ...form, applied: e.target.value })}>
-                  <option value="YES">Applied: YES</option>
-                  <option value="NO">Applied: NO</option>
-                </select>
-                <textarea className="jat-textarea" placeholder="Remarks" rows={3} value={form.remarks} onChange={e => setForm({ ...form, remarks: e.target.value })} style={{ gridColumn: '1 / -1' }} maxLength={500} />
-              </div>
-              {editingId ? (
-                <div style={{ display: 'flex', gap: '10px', marginTop: '12px' }}>
-                  <button type="submit" className="jat-add-btn" style={{ margin: 0 }}>Save changes</button>
-                  <button type="button" className="jat-add-btn danger" style={{ margin: 0, background: 'var(--danger)', color: '#fff' }} onClick={() => doDelete(editingId)}>Delete application</button>
-                  <button type="button" className="jat-add-btn" style={{ margin: 0, background: 'var(--surface-2)', color: 'var(--text)' }} onClick={cancelEdit}>Cancel</button>
-                </div>
-              ) : (
-                <button type="submit" className="jat-add-btn">Add to top</button>
-              )}
-            </form>
-          </div>
-
-          <div className="jat-toolbar">
-            <input className="jat-input" placeholder="Search company, role, source…" value={search} onChange={e => setSearch(e.target.value)} />
-            <select className="jat-select" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
-              <option value="All">All statuses</option>
-              {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </div>
-
-          {tableScrollWidth > 0 && (
-            <div 
-              ref={topScrollRef} 
-              onScroll={handleTopScroll} 
-              className="jat-top-scroll-wrap"
-            >
-              <div style={{ width: tableScrollWidth + 'px', height: '1px' }} />
-            </div>
-          )}
-          <div className="jat-table-wrap" ref={tableWrapRef} onScroll={handleTableScroll}>
-            {filteredApps.length === 0 ? (
-              <div className="jat-empty">No applications yet. Add your first one above — it'll appear right here at the top.</div>
-            ) : (
-              <table className="jat-table" ref={tableRef}>
-                <thead>
-                  <tr>
-                    <th>Date</th><th>Type</th><th>Source</th><th>Company</th><th>Role</th><th>Job Link</th>
-                    <th>Ref Sent</th><th>Responses</th><th>Ref Given</th><th>Status</th><th>Avg Salary</th>
-                    <th>Follow-up</th><th>Applied</th><th>Remarks</th><th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredApps.map(a => (
-                    <tr key={a.id} style={editingId === a.id ? { background: 'rgba(91, 141, 239, 0.15)' } : {}}>
-                      <td className="jat-mono">{formatDisplay(a.date)}</td>
-                      <td><span className="jat-tag" style={{ background: TYPE_COLORS[normType(a.applicationType)] + '22', color: TYPE_COLORS[normType(a.applicationType)] }}>{a.applicationType}</span></td>
-                      <td>{a.source || '—'}</td>
-                      <td>{a.companyName}</td>
-                      <td>{a.role}</td>
-                      <td>{a.jobLink ? <a className="jat-link" href={a.jobLink} target="_blank" rel="noopener noreferrer">{a.jobLink}</a> : '—'}</td>
-                      <td className="jat-mono">{a.referralReqSent || '—'}</td>
-                      <td className="jat-mono">{a.responsesReceived || '—'}</td>
-                      <td className="jat-mono">{a.referralsGiven || '—'}</td>
-                      <td><span className="jat-tag" style={{ background: STATUS_COLORS[a.status] + '22', color: STATUS_COLORS[a.status] }}>{a.status}</span></td>
-                      <td>{a.avgSalary || '—'}</td>
-                      <td className="jat-mono">{a.followUpDate ? formatDisplay(a.followUpDate) : '—'}</td>
-                      <td>{a.applied}</td>
-                      <td style={{ maxWidth: 260, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{a.remarks || '—'}</td>
-                      <td style={{ whiteSpace: 'nowrap' }}>
-                        <button className="jat-icon-btn" onClick={() => startEdit(a)}>Edit</button>
-                        <button className="jat-icon-btn danger" onClick={() => doDelete(a.id)}>Delete</button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </>
+        <LogForm
+          editingId={editingId}
+          form={form}
+          setForm={setForm}
+          handleAdd={handleAdd}
+          cancelEdit={cancelEdit}
+          doDelete={doDelete}
+          STATUS_OPTIONS={STATUS_OPTIONS}
+          LOG_TYPE_OPTIONS={LOG_TYPE_OPTIONS}
+          inputCls={inputCls}
+        />
       )}
 
-      {dataLoaded && tab === 'daily' && (
-        <>
-          {tableScrollWidth > 0 && (
-            <div ref={topScrollRef} onScroll={handleTopScroll} className="jat-top-scroll-wrap">
-              <div style={{ width: tableScrollWidth + 'px', height: '1px' }} />
-            </div>
-          )}
-          <div className="jat-table-wrap" ref={tableWrapRef} onScroll={handleTableScroll}>
-            {dailyData.length === 0 ? <div className="jat-empty">No data yet.</div> : (
-              <table className="jat-table" ref={tableRef}>
-                <thead><tr><th>Date</th><th>Referral</th><th>Cold Mail</th><th>Manual</th><th>Manual Target</th><th>Status</th><th>Total</th></tr></thead>
-                <tbody>
-                  {dailyData.map(([date, v]) => (
-                    <tr key={date}>
-                      <td className="jat-mono">{formatDisplay(date)}</td>
-                      <td className="jat-mono">{v.Referral}</td>
-                      <td className="jat-mono">{v['Cold Mail']}</td>
-                      <td className="jat-mono">{v.Manual}</td>
-                      <td className="jat-mono">{targetTotal}</td>
-                      <td className={v.Manual >= targetTotal ? 'jat-met' : 'jat-notmet'}>{v.Manual >= targetTotal ? 'Target Met' : 'Below Target'}</td>
-                      <td className="jat-mono">{v.total}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </>
-      )}
-
-      {dataLoaded && tab === 'weekly' && (
-        <>
-          {tableScrollWidth > 0 && (
-            <div ref={topScrollRef} onScroll={handleTopScroll} className="jat-top-scroll-wrap">
-              <div style={{ width: tableScrollWidth + 'px', height: '1px' }} />
-            </div>
-          )}
-          <div className="jat-table-wrap" ref={tableWrapRef} onScroll={handleTableScroll}>
-            {weeklyData.length === 0 ? <div className="jat-empty">No data yet.</div> : (
-              <table className="jat-table" ref={tableRef}>
-                <thead><tr><th>Week</th><th>Referral</th><th>Cold Mail</th><th>Manual</th><th>Manual Target</th><th>Status</th><th>Total</th></tr></thead>
-                <tbody>
-                  {weeklyData.map(([wk, v]) => {
-                    const wTarget = targetTotal * 7;
-                    return (
-                      <tr key={wk}>
-                        <td className="jat-mono">{formatWeekLabel(wk)}</td>
-                        <td className="jat-mono">{v.Referral}</td>
-                        <td className="jat-mono">{v['Cold Mail']}</td>
-                        <td className="jat-mono">{v.Manual}</td>
-                        <td className="jat-mono">{wTarget}</td>
-                        <td className={v.Manual >= wTarget ? 'jat-met' : 'jat-notmet'}>{v.Manual >= wTarget ? 'Target Met' : 'Below Target'}</td>
-                        <td className="jat-mono">{v.total}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </>
-      )}
-
-      {dataLoaded && tab === 'monthly' && (
-        <>
-          {tableScrollWidth > 0 && (
-            <div ref={topScrollRef} onScroll={handleTopScroll} className="jat-top-scroll-wrap">
-              <div style={{ width: tableScrollWidth + 'px', height: '1px' }} />
-            </div>
-          )}
-          <div className="jat-table-wrap" ref={tableWrapRef} onScroll={handleTableScroll}>
-            {monthlyData.length === 0 ? <div className="jat-empty">No data yet.</div> : (
-              <table className="jat-table" ref={tableRef}>
-                <thead><tr><th>Month</th><th>Referral</th><th>Cold Mail</th><th>Manual</th><th>Manual Target</th><th>Status</th><th>Total</th></tr></thead>
-                <tbody>
-                  {monthlyData.map(([key, v]) => {
-                    const [y, m] = key.split('-').map(Number);
-                    const mTarget = targetTotal * daysInMonth(y, m - 1);
-                    return (
-                      <tr key={key}>
-                        <td className="jat-mono">{monthLabel(key)}</td>
-                        <td className="jat-mono">{v.Referral}</td>
-                        <td className="jat-mono">{v['Cold Mail']}</td>
-                        <td className="jat-mono">{v.Manual}</td>
-                        <td className="jat-mono">{mTarget}</td>
-                        <td className={v.Manual >= mTarget ? 'jat-met' : 'jat-notmet'}>{v.Manual >= mTarget ? 'Target Met' : 'Below Target'}</td>
-                        <td className="jat-mono">{v.total}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </>
+      {dataLoaded && ['log', 'daily', 'weekly', 'monthly'].includes(tab) && (
+        <Tables
+          tab={tab}
+          filteredApps={filteredApps}
+          dailyData={dailyData}
+          weeklyData={weeklyData}
+          monthlyData={monthlyData}
+          targetTotal={targetTotal}
+          startEdit={startEdit}
+          doDelete={doDelete}
+          editingId={editingId}
+          search={search}
+          setSearch={setSearch}
+          statusFilter={statusFilter}
+          setStatusFilter={setStatusFilter}
+        />
       )}
 
       {dataLoaded && tab === 'summary' && (
@@ -691,29 +376,36 @@ export default function JobTracker({ user, onSignOut }) {
             <div className="jat-kpi"><div className="jat-kpi-label">Responses Received</div><div className="jat-kpi-value">{summary.responses}</div></div>
             <div className="jat-kpi"><div className="jat-kpi-label">Referrals Given</div><div className="jat-kpi-value">{summary.referralsGiven}</div></div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16 }}>
+
+          <div className="jat-kpi-row" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))' }}>
             <div className="jat-card">
               <h3 className="jat-card-title">Status Breakdown</h3>
               <div className="jat-status-list">
-                {STATUS_OPTIONS.map(s => (
-                  <div className="jat-status-row" key={s}>
-                    <span className="jat-status-dot" style={{ background: STATUS_COLORS[s] }} />
-                    <span className="jat-status-name">{s}</span>
-                    <span className="jat-status-count">{summary.statusCounts[s]}</span>
-                  </div>
-                ))}
+                {STATUS_OPTIONS.map(s => {
+                  const count = summary.statusCounts[s] || 0;
+                  return (
+                    <div className="jat-status-row" key={s}>
+                      <div className="jat-status-dot" style={{ background: STATUS_COLORS[s] }} />
+                      <div className="jat-status-name">{s}</div>
+                      <div className="jat-status-count">{count}</div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
             <div className="jat-card">
               <h3 className="jat-card-title">Application Type Breakdown</h3>
               <div className="jat-status-list">
-                {TYPE_OPTIONS.map(t => (
-                  <div className="jat-status-row" key={t}>
-                    <span className="jat-status-dot" style={{ background: TYPE_COLORS[t] }} />
-                    <span className="jat-status-name">{t}</span>
-                    <span className="jat-status-count">{summary.typeCounts[t]}</span>
-                  </div>
-                ))}
+                {TYPE_OPTIONS.map(t => {
+                  const count = summary.typeCounts[t] || 0;
+                  return (
+                    <div className="jat-status-row" key={t}>
+                      <div className="jat-status-dot" style={{ background: TYPE_COLORS[t] }} />
+                      <div className="jat-status-name">{t}</div>
+                      <div className="jat-status-count">{count}</div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -722,28 +414,21 @@ export default function JobTracker({ user, onSignOut }) {
 
       {dataLoaded && tab === 'targets' && (
         <div className="jat-card">
-          <h3 className="jat-card-title">Daily targets</h3>
-          <p className="jat-subtitle" style={{ marginTop: -6, marginBottom: 14 }}>Set your daily target goals for each application type. These sync across all your devices.</p>
+          <h3 className="jat-card-title">Configure Daily Targets</h3>
           <div className="jat-target-form">
             <div className="jat-target-field">
-              <label>Referral</label>
-              <input className="jat-input" type="number" min="0" value={targets.Referral !== undefined ? targets.Referral : 5}
-                onChange={e => updateTarget('Referral', e.target.value === '' ? '' : Number(e.target.value))} />
+              <label>Manual Applications</label>
+              <input className={inputCls} type="number" min="0" value={targets.Manual} onChange={e => updateTarget('Manual', e.target.value)} />
             </div>
             <div className="jat-target-field">
-              <label>Cold Mail</label>
-              <input className="jat-input" type="number" min="0" value={targets['Cold Mail'] !== undefined ? targets['Cold Mail'] : 5}
-                onChange={e => updateTarget('Cold Mail', e.target.value === '' ? '' : Number(e.target.value))} />
+              <label>Referral Requests</label>
+              <input className={inputCls} type="number" min="0" value={targets.Referral} onChange={e => updateTarget('Referral', e.target.value)} />
             </div>
             <div className="jat-target-field">
-              <label>Manual</label>
-              <input className="jat-input" type="number" min="0" value={targets.Manual !== undefined ? targets.Manual : 25}
-                onChange={e => updateTarget('Manual', e.target.value === '' ? '' : Number(e.target.value))} />
+              <label>Cold Mails</label>
+              <input className={inputCls} type="number" min="0" value={targets.Cold_Mail || targets['Cold Mail']} onChange={e => updateTarget('Cold Mail', e.target.value)} />
             </div>
           </div>
-          <p className="jat-subtitle" style={{ marginTop: 16 }}>
-            Daily Goals — Referral: <span className="jat-mono">{targets.Referral || 5}</span> · Cold Mail: <span className="jat-mono">{targets['Cold Mail'] || 5}</span> · Manual: <span className="jat-mono">{targets.Manual || 25}</span>
-          </p>
         </div>
       )}
     </div>

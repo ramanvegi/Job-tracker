@@ -1,0 +1,126 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+.jat-root {
+  --bg: #0F1115; --surface: #171B22; --surface-2: #1D222B; --border: #262B35;
+  --text: #EDEFF3; --text-dim: #8B93A1; --text-faint: #5B616F;
+  --referral: #5B8DEF; --coldmail: #F5A623; --manual: #2DD4BF;
+  --success: #4ADE80; --danger: #F0556B;
+  background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif;
+  min-height: 100vh; padding: 24px; box-sizing: border-box;
+}
+.jat-root * { box-sizing: border-box; }
+.jat-display { font-family: 'Space Grotesk', sans-serif; }
+.jat-mono { font-family: 'IBM Plex Mono', monospace; }
+.jat-header { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px; margin-bottom: 20px; }
+.jat-title { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; margin: 0; }
+.jat-subtitle { color: var(--text-dim); font-size: 13px; margin-top: 4px; }
+.jat-header-actions { display: flex; gap: 10px; align-items: center; }
+.jat-user-email { color: var(--text-dim); font-size: 12px; }
+.jat-export-btn, .jat-signout-btn { background: var(--surface-2); border: 1px solid var(--border); color: var(--text);
+  padding: 10px 16px; border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer; }
+.jat-export-btn:hover, .jat-signout-btn:hover { border-color: var(--text-faint); }
+.jat-pulse { 
+  display: flex; gap: 14px; background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; padding: 14px 18px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; 
+  position: sticky; top: 0; z-index: 100;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.6);
+}
+.jat-pulse-item { min-width: 130px; flex: 1; }
+.jat-pulse-label { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-dim); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.04em; }
+.jat-pulse-count { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--text); }
+.jat-bar-track { height: 6px; background: var(--surface-2); border-radius: 3px; overflow: hidden; }
+.jat-bar-fill { height: 100%; border-radius: 3px; transition: width 0.3s ease; }
+.jat-tabs { display: flex; gap: 4px; margin-bottom: 20px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.jat-tab { padding: 10px 16px; background: none; border: none; color: var(--text-dim); font-size: 13px;
+  font-weight: 500; cursor: pointer; border-bottom: 2px solid transparent; font-family: 'Inter', sans-serif; }
+.jat-tab.active { color: var(--text); border-bottom-color: var(--referral); }
+.jat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px; margin-bottom: 18px; }
+.jat-card-title { font-size: 14px; font-weight: 600; margin: 0 0 14px 0; }
+.jat-form-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
+.jat-input, .jat-select { background: var(--surface-2); border: 1px solid var(--border); color: var(--text);
+  padding: 8px 10px; border-radius: 6px; font-size: 13px; width: 100%; font-family: 'Inter', sans-serif; }
+.jat-input::placeholder { color: var(--text-faint); }
+.jat-input:focus, .jat-select:focus { outline: none; border-color: var(--referral); }
+.jat-textarea { background: var(--surface-2); border: 1px solid var(--border); color: var(--text);
+  padding: 8px 10px; border-radius: 6px; font-size: 13px; width: 100%; font-family: 'Inter', sans-serif;
+  resize: vertical; min-height: 60px; }
+.jat-textarea::placeholder { color: var(--text-faint); }
+.jat-textarea:focus { outline: none; border-color: var(--referral); }
+.jat-add-btn { background: var(--referral); color: #0F1115; border: none; padding: 9px 18px; border-radius: 6px;
+  font-size: 13px; font-weight: 600; cursor: pointer; margin-top: 12px; }
+.jat-add-btn:hover { opacity: 0.9; }
+.jat-toolbar { display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+.jat-toolbar .jat-input, .jat-toolbar .jat-select { width: auto; min-width: 160px; }
+.jat-table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; }
+.jat-top-scroll-wrap {
+  overflow-x: auto;
+  overflow-y: hidden;
+  width: 100%;
+  height: 10px;
+  margin-bottom: 4px;
+  position: sticky;
+  top: 62px;
+  z-index: 99;
+  background: var(--bg);
+}
+.jat-top-scroll-wrap::-webkit-scrollbar,
+.jat-table-wrap::-webkit-scrollbar {
+  height: 6px;
+}
+.jat-top-scroll-wrap::-webkit-scrollbar-track,
+.jat-table-wrap::-webkit-scrollbar-track {
+  background: var(--surface-2);
+  border-radius: 3px;
+}
+.jat-top-scroll-wrap::-webkit-scrollbar-thumb,
+.jat-table-wrap::-webkit-scrollbar-thumb {
+  background: #ffffff;
+  border-radius: 3px;
+}
+.jat-top-scroll-wrap::-webkit-scrollbar-thumb:hover,
+.jat-table-wrap::-webkit-scrollbar-thumb:hover {
+  background: #e2e8f0;
+}
+table.jat-table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+table.jat-table th { background: var(--surface-2); color: var(--text-dim); text-align: left; padding: 10px 12px;
+  font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.03em; white-space: nowrap; }
+table.jat-table td { padding: 9px 12px; border-top: 1px solid var(--border); vertical-align: top; }
+table.jat-table tr:hover td { background: rgba(255,255,255,0.02); }
+.jat-tag { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+.jat-link { color: var(--referral); text-decoration: none; max-width: 200px; display: inline-block;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
+.jat-link:hover { text-decoration: underline; }
+.jat-icon-btn { background: none; border: 1px solid var(--border); color: var(--text-dim); border-radius: 5px;
+  padding: 4px 8px; font-size: 11px; cursor: pointer; margin-right: 4px; font-family: 'Inter', sans-serif; }
+.jat-icon-btn:hover { color: var(--text); border-color: var(--text-faint); }
+.jat-icon-btn.danger:hover { color: var(--danger); border-color: var(--danger); }
+.jat-empty { text-align: center; color: var(--text-faint); padding: 30px; font-size: 13px; }
+.jat-kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 18px; }
+.jat-kpi { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px; }
+.jat-kpi-label { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 6px; }
+.jat-kpi-value { font-family: 'IBM Plex Mono', monospace; font-size: 22px; font-weight: 500; }
+.jat-status-list { display: flex; flex-direction: column; gap: 8px; }
+.jat-status-row { display: flex; align-items: center; gap: 10px; }
+.jat-status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.jat-status-name { flex: 1; font-size: 13px; color: var(--text-dim); }
+.jat-status-count { font-family: 'IBM Plex Mono', monospace; font-size: 13px; }
+.jat-target-form { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-end; }
+.jat-target-field label { display: block; font-size: 11px; color: var(--text-dim); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.03em; }
+.jat-target-field input { width: 100px; }
+.jat-met { color: var(--success); font-weight: 600; }
+.jat-notmet { color: var(--text-faint); }
+
+@media (max-width: 768px) {
+  .jat-root { padding: 12px; }
+  .jat-header { flex-direction: column; align-items: stretch; gap: 12px; }
+  .jat-header-actions { flex-direction: column; align-items: stretch; width: 100%; gap: 8px; }
+  .jat-user-email { text-align: left; }
+  .jat-pulse { padding: 12px; gap: 12px; }
+  .jat-pulse-item { min-width: calc(50% - 6px); }
+  .jat-pulse-item:last-child { min-width: 100%; }
+  .jat-toolbar { flex-direction: column; align-items: stretch; }
+  .jat-toolbar .jat-input, .jat-toolbar .jat-select { width: 100%; }
+  .jat-form-grid { grid-template-columns: 1fr; }
+  .jat-kpi-row { grid-template-columns: 1fr 1fr; }
+  .jat-top-scroll-wrap { top: 112px; }
+}
